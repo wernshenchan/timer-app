@@ -69,7 +69,9 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         createdAt: Date.now(),
         totalTrackedSeconds: 0,
         isRunning: false,
+        isPaused: false,
         sessionStartAt: null,
+        pausedAt: null,
       };
       set((state) => {
         const newState = { ...state, projects: [...state.projects, project] };
