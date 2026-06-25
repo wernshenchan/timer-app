@@ -96,40 +96,41 @@ export const useTimeStore = create<TimeStore>((set, get) => {
 
     startTimer: (projectId: string) => {
       set((state) => {
-        // Stop any other running timers first
-        const updatedProjects = state.projects.map((p) => {
-          if (p.id === projectId) {
-            return { ...p, isRunning: true, sessionStartAt: Date.now() };
-          }
-          if (p.isRunning) {
-            // Stop other running timers and log their time
-            const elapsed = Math.floor((Date.now() - (p.sessionStartAt || Date.now())) / 1000);
-            const entry: TimeEntry = {
+        const now = Date.now();
+
+        // Gather entries for any other running projects being stopped
+        const entries: TimeEntry[] = [];
+        for (const p of state.projects) {
+          if (p.isRunning && p.id !== projectId && p.sessionStartAt) {
+            const elapsed = Math.floor((now - p.sessionStartAt) / 1000);
+            entries.push({
               id: generateId(),
               projectId: p.id,
-              startTime: p.sessionStartAt || Date.now(),
-              endTime: Date.now(),
+              startTime: p.sessionStartAt,
+              endTime: now,
               durationSeconds: elapsed,
               date: getToday(),
-            };
-            return { ...p, isRunning: false, sessionStartAt: null, totalTrackedSeconds: p.totalTrackedSeconds + elapsed };
+            });
+          }
+        }
+
+        const newTimeEntries = [...state.timeEntries, ...entries];
+
+        // Recalculate totals for projects that were stopped
+        const stoppedIds = new Set(entries.map((e) => e.projectId));
+        const updatedProjects = state.projects.map((p) => {
+          if (p.id === projectId) {
+            return { ...p, isRunning: true, sessionStartAt: now };
+          }
+          if (stoppedIds.has(p.id)) {
+            const total = newTimeEntries
+              .filter((e) => e.projectId === p.id)
+              .reduce((sum, e) => sum + e.durationSeconds, 0);
+            return { ...p, isRunning: false, sessionStartAt: null, totalTrackedSeconds: total };
           }
           return p;
         });
 
-        // Gather any new time entries created from stopping other timers
-        const entries = state.projects
-          .filter((p) => p.isRunning && p.id !== projectId)
-          .map((p) => ({
-            id: generateId(),
-            projectId: p.id,
-            startTime: p.sessionStartAt || Date.now(),
-            endTime: Date.now(),
-            durationSeconds: Math.floor((Date.now() - (p.sessionStartAt || Date.now())) / 1000),
-            date: getToday(),
-          }));
-
-        const newTimeEntries = [...state.timeEntries, ...entries];
         saveData({ projects: updatedProjects, timeEntries: newTimeEntries });
         return { projects: updatedProjects, timeEntries: newTimeEntries };
       });
@@ -140,25 +141,30 @@ export const useTimeStore = create<TimeStore>((set, get) => {
       const project = state.projects.find((p) => p.id === projectId);
       if (!project || !project.isRunning || !project.sessionStartAt) return;
 
-      const elapsed = Math.floor((Date.now() - project.sessionStartAt) / 1000);
+      const now = Date.now();
+      const elapsed = Math.floor((now - project.sessionStartAt) / 1000);
       const entry: TimeEntry = {
         id: generateId(),
         projectId,
         startTime: project.sessionStartAt,
-        endTime: Date.now(),
+        endTime: now,
         durationSeconds: elapsed,
         date: getToday(),
       };
 
       set((state) => {
+        const newTimeEntries = [...state.timeEntries, entry];
+        const total = newTimeEntries
+          .filter((e) => e.projectId === projectId)
+          .reduce((sum, e) => sum + e.durationSeconds, 0);
         const newState = {
           ...state,
           projects: state.projects.map((p) =>
             p.id === projectId
-              ? { ...p, isRunning: false, sessionStartAt: null, totalTrackedSeconds: p.totalTrackedSeconds + elapsed }
+              ? { ...p, isRunning: false, sessionStartAt: null, totalTrackedSeconds: total }
               : p
           ),
-          timeEntries: [...state.timeEntries, entry],
+          timeEntries: newTimeEntries,
         };
         saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
         return newState;
@@ -251,10 +257,13 @@ export const useTimeStore = create<TimeStore>((set, get) => {
       const state = get();
       const project = state.projects.find((p) => p.id === projectId);
       if (!project) return 0;
+      const entriesTotal = state.timeEntries
+        .filter((e) => e.projectId === projectId)
+        .reduce((sum, e) => sum + e.durationSeconds, 0);
       const running = project.isRunning && project.sessionStartAt
         ? Math.floor((Date.now() - project.sessionStartAt) / 1000)
         : 0;
-      return project.totalTrackedSeconds + running;
+      return entriesTotal + running;
     },
 
     getTodayEntriesForProject: (projectId: string) => {
