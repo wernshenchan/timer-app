@@ -111,41 +111,19 @@ export const useTimeStore = create<TimeStore>((set, get) => {
       set((state) => {
         const now = Date.now();
 
-        // Gather entries for any other running projects being stopped
-        const entries: TimeEntry[] = [];
-        for (const p of state.projects) {
-          if (p.isRunning && p.id !== projectId && p.sessionStartAt) {
-            const elapsed = Math.floor((now - p.sessionStartAt) / 1000);
-            entries.push({
-              id: generateId(),
-              projectId: p.id,
-              startTime: p.sessionStartAt,
-              endTime: now,
-              durationSeconds: elapsed,
-              date: getToday(),
-            });
-          }
-        }
-
-        const newTimeEntries = [...state.timeEntries, ...entries];
-
-        // Recalculate totals for projects that were stopped
-        const stoppedIds = new Set(entries.map((e) => e.projectId));
         const updatedProjects = state.projects.map((p) => {
           if (p.id === projectId) {
-            return { ...p, isRunning: true, sessionStartAt: now };
+            return { ...p, isRunning: true, isPaused: false, sessionStartAt: now, pausedAt: null };
           }
-          if (stoppedIds.has(p.id)) {
-            const total = newTimeEntries
-              .filter((e) => e.projectId === p.id)
-              .reduce((sum, e) => sum + e.durationSeconds, 0);
-            return { ...p, isRunning: false, sessionStartAt: null, totalTrackedSeconds: total };
+          // Pause any other running project
+          if (p.isRunning && p.id !== projectId && p.sessionStartAt) {
+            return { ...p, isRunning: false, isPaused: true, pausedAt: now };
           }
           return p;
         });
 
-        saveData({ projects: updatedProjects, timeEntries: newTimeEntries });
-        return { projects: updatedProjects, timeEntries: newTimeEntries };
+        saveData({ projects: updatedProjects, timeEntries: state.timeEntries });
+        return { projects: updatedProjects, timeEntries: state.timeEntries };
       });
     },
 
@@ -223,17 +201,23 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         const now = Date.now();
         const newState = {
           ...state,
-          projects: state.projects.map((p) =>
-            p.id === projectId && p.isPaused && p.sessionStartAt && p.pausedAt
-              ? {
-                  ...p,
-                  isRunning: true,
-                  isPaused: false,
-                  sessionStartAt: now - (p.pausedAt - p.sessionStartAt),
-                  pausedAt: null,
-                }
-              : p
-          ),
+          projects: state.projects.map((p) => {
+            // Pause any other running project
+            if (p.isRunning && p.id !== projectId) {
+              return { ...p, isRunning: false, isPaused: true, pausedAt: now };
+            }
+            // Resume the target project
+            if (p.id === projectId && p.isPaused && p.sessionStartAt && p.pausedAt) {
+              return {
+                ...p,
+                isRunning: true,
+                isPaused: false,
+                sessionStartAt: now - (p.pausedAt - p.sessionStartAt),
+                pausedAt: null,
+              };
+            }
+            return p;
+          }),
         };
         saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
         return newState;
