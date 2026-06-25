@@ -33,6 +33,8 @@ interface TimeStore {
   startTimer: (projectId: string) => void;
   stopTimer: (projectId: string) => void;
   adjustStartTime: (projectId: string, newStartTime: number) => void;
+  editTimeEntry: (entryId: string, newStartTime: number, newEndTime: number) => void;
+  deleteTimeEntry: (entryId: string) => void;
   getRunningSeconds: (projectId: string) => number;
   getTotalSecondsForProject: (projectId: string) => number;
   getTodayEntriesForProject: (projectId: string) => TimeEntry[];
@@ -174,6 +176,56 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         };
         saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
         return newState;
+      });
+    },
+
+    editTimeEntry: (entryId: string, newStartTime: number, newEndTime: number) => {
+      if (newStartTime >= newEndTime) return;
+      set((state) => {
+        const updatedEntries = state.timeEntries.map((e) => {
+          if (e.id !== entryId) return e;
+          const d = new Date(e.endTime);
+          const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          return {
+            ...e,
+            startTime: newStartTime,
+            endTime: newEndTime,
+            durationSeconds: Math.floor((newEndTime - newStartTime) / 1000),
+            date: dateStr,
+          };
+        });
+
+        // Recalculate totalTrackedSeconds for the affected project
+        const entry = state.timeEntries.find((e) => e.id === entryId);
+        const projectId = entry?.projectId;
+        const updatedProjects = state.projects.map((p) => {
+          if (p.id !== projectId) return p;
+          const total = updatedEntries
+            .filter((e) => e.projectId === projectId)
+            .reduce((sum, e) => sum + e.durationSeconds, 0);
+          return { ...p, totalTrackedSeconds: total };
+        });
+
+        saveData({ projects: updatedProjects, timeEntries: updatedEntries });
+        return { projects: updatedProjects, timeEntries: updatedEntries };
+      });
+    },
+
+    deleteTimeEntry: (entryId: string) => {
+      set((state) => {
+        const entry = state.timeEntries.find((e) => e.id === entryId);
+        const projectId = entry?.projectId;
+        const updatedEntries = state.timeEntries.filter((e) => e.id !== entryId);
+        const updatedProjects = state.projects.map((p) => {
+          if (p.id !== projectId) return p;
+          const total = updatedEntries
+            .filter((e) => e.projectId === projectId)
+            .reduce((sum, e) => sum + e.durationSeconds, 0);
+          return { ...p, totalTrackedSeconds: total };
+        });
+
+        saveData({ projects: updatedProjects, timeEntries: updatedEntries });
+        return { projects: updatedProjects, timeEntries: updatedEntries };
       });
     },
 
