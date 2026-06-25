@@ -94,25 +94,29 @@ export default function DailyHistory() {
                     .map((entry) => (
                       <div
                         key={entry.id}
-                        className="flex items-center justify-between py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group"
+                        className="py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+                        onClick={() => setEditingEntry(entry)}
                       >
-                        <div className="flex items-center gap-2 text-xs text-zinc-500">
-                          <span>{formatSessionTime(entry.startTime)}</span>
-                          <span className="text-zinc-700">-</span>
-                          <span>{formatSessionTime(entry.endTime)}</span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs text-zinc-500">
+                            <span>{formatSessionTime(entry.startTime)}</span>
+                            <span className="text-zinc-700">-</span>
+                            <span>{formatSessionTime(entry.endTime)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="timer-font text-xs text-zinc-400 tabular-nums">
+                              {formatTime(entry.durationSeconds)}
+                            </span>
+                            <span
+                              className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 hover:text-amber-400 transition-all"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                            {formatTime(entry.durationSeconds)}
-                          </span>
-                          <button
-                            onClick={() => setEditingEntry(entry)}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 hover:text-amber-400 transition-all"
-                            title="Edit session"
-                          >
-                            <Pencil className="w-3 h-3" />
-                          </button>
-                        </div>
+                        {entry.note && (
+                          <p className="text-xs text-zinc-500 mt-0.5 ml-0 truncate">{entry.note}</p>
+                        )}
                       </div>
                     ))}
                 </div>
@@ -131,28 +135,30 @@ export default function DailyHistory() {
                 return (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group"
+                    className="py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+                    onClick={() => setEditingEntry(entry)}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-zinc-300 text-xs truncate">
-                        {project?.name || 'Unknown'}
-                      </span>
-                      <span className="text-zinc-600 text-xs shrink-0">
-                        {formatSessionTime(entry.startTime)} - {formatSessionTime(entry.endTime)}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-zinc-300 text-xs truncate">
+                          {project?.name || 'Unknown'}
+                        </span>
+                        <span className="text-zinc-600 text-xs shrink-0">
+                          {formatSessionTime(entry.startTime)} - {formatSessionTime(entry.endTime)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="timer-font text-xs text-zinc-400 tabular-nums">
+                          {formatTime(entry.durationSeconds)}
+                        </span>
+                        <span className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 transition-all">
+                          <Pencil className="w-3 h-3" />
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                        {formatTime(entry.durationSeconds)}
-                      </span>
-                      <button
-                        onClick={() => setEditingEntry(entry)}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 hover:text-amber-400 transition-all"
-                        title="Edit session"
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                    </div>
+                    {entry.note && (
+                      <p className="text-xs text-zinc-500 mt-0.5 ml-0 truncate">{entry.note}</p>
+                    )}
                   </div>
                 );
               })}

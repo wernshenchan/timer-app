@@ -14,6 +14,7 @@ export interface TimeEntry {
   endTime: number;
   durationSeconds: number;
   date: string;
+  note?: string;
 }
 
 export interface AppData {

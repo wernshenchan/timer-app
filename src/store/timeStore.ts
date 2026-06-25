@@ -34,6 +34,7 @@ interface TimeStore {
   stopTimer: (projectId: string) => void;
   adjustStartTime: (projectId: string, newStartTime: number) => void;
   editTimeEntry: (entryId: string, newStartTime: number, newEndTime: number) => void;
+  setEntryNote: (entryId: string, note: string) => void;
   deleteTimeEntry: (entryId: string) => void;
   getRunningSeconds: (projectId: string) => number;
   getTotalSecondsForProject: (projectId: string) => number;
@@ -226,6 +227,16 @@ export const useTimeStore = create<TimeStore>((set, get) => {
 
         saveData({ projects: updatedProjects, timeEntries: updatedEntries });
         return { projects: updatedProjects, timeEntries: updatedEntries };
+      });
+    },
+
+    setEntryNote: (entryId: string, note: string) => {
+      set((state) => {
+        const updatedEntries = state.timeEntries.map((e) =>
+          e.id === entryId ? { ...e, note: note.trim() || undefined } : e
+        );
+        saveData({ projects: state.projects, timeEntries: updatedEntries });
+        return { ...state, timeEntries: updatedEntries };
       });
     },
 

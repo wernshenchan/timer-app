@@ -12,6 +12,7 @@ interface Props {
 
 export default function SessionEditModal({ entry, projectName, onClose }: Props) {
   const editTimeEntry = useTimeStore((s) => s.editTimeEntry);
+  const setEntryNote = useTimeStore((s) => s.setEntryNote);
   const deleteTimeEntry = useTimeStore((s) => s.deleteTimeEntry);
 
   const startDate = new Date(entry.startTime);
@@ -29,6 +30,7 @@ export default function SessionEditModal({ entry, projectName, onClose }: Props)
   const [endTm, setEndTm] = useState(
     `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`
   );
+  const [note, setNote] = useState(entry.note || '');
 
   const newStart = new Date(`${startDt}T${startTm}:00`).getTime();
   const newEnd = new Date(`${endDt}T${endTm}:00`).getTime();
@@ -38,6 +40,7 @@ export default function SessionEditModal({ entry, projectName, onClose }: Props)
     if (isNaN(newStart) || isNaN(newEnd)) return;
     if (newStart >= newEnd) return;
     editTimeEntry(entry.id, newStart, newEnd);
+    setEntryNote(entry.id, note);
     onClose();
   };
 
@@ -87,6 +90,18 @@ export default function SessionEditModal({ entry, projectName, onClose }: Props)
             <span className="timer-font text-amber-400 font-medium tabular-nums text-sm">
               {formatTime(newDuration)}
             </span>
+          </div>
+
+          <div>
+            <label className="text-zinc-500 text-xs mb-1 block">Note</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="What did you work on? e.g. task A, bug fix..."
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-zinc-100 text-sm placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-600/50"
+              maxLength={200}
+            />
           </div>
 
           <div className="flex gap-2 pt-1">
