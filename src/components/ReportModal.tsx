@@ -1,6 +1,6 @@
 import { useTimeStore } from '@/store/timeStore';
 import { formatTime } from '@/hooks/useTimerDisplay';
-import { X, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { X, Copy, Check, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 
 interface Props {
@@ -114,6 +114,53 @@ export default function ReportModal({ onClose }: Props) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCSV = () => {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const safeName = filterLabel.replace(/[^a-zA-Z0-9]/g, '_');
+
+    const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+    const rows: string[][] = [];
+    rows.push([csvEscape(`Time Tracking Report — ${filterLabel}`)]);
+    rows.push([csvEscape(`Generated: ${dateStr}`)]);
+    rows.push([]);
+    rows.push(['Overview']);
+    rows.push(['Total Time', formatTime(overallTotal)]);
+    rows.push(['Total Sessions', String(totalSessions)]);
+    rows.push(['Active Days', String(totalDays)]);
+    if (!filterProjectId) rows.push(['Projects Tracked', String(reportData.length)]);
+    rows.push([]);
+    rows.push(['Project', 'Date', 'Start', 'End', 'Duration', 'Note']);
+
+    for (const d of reportData) {
+      for (const e of d.entries) {
+        const start = new Date(e.startTime);
+        const end = new Date(e.endTime);
+        const dateCol = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+        const startCol = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+        const endCol = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+        rows.push([
+          csvEscape(d.project.name),
+          dateCol,
+          startCol,
+          endCol,
+          formatTime(e.durationSeconds),
+          csvEscape(e.note || ''),
+        ]);
+      }
+    }
+
+    const csv = rows.map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time-report-${safeName}-${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -129,6 +176,13 @@ export default function ReportModal({ onClose }: Props) {
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied' : 'Copy'}
+            </button>
+            <button
+              onClick={handleCSV}
+              className="flex items-center gap-1.5 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg py-1.5 px-3 transition-colors"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              CSV
             </button>
             <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors">
               <X className="w-4 h-4" />
