@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import { formatTime } from '@/hooks/useTimerDisplay';
-import { Clock } from 'lucide-react';
+import { Clock, BarChart3 } from 'lucide-react';
 
-export default function Header() {
+interface Props {
+  onReportClick: () => void;
+}
+
+export default function Header({ onReportClick }: Props) {
   const getTotalTodaySeconds = useTimeStore((s) => s.getTotalTodaySeconds);
   const [totalToday, setTotalToday] = useState('00:00:00');
 
@@ -21,9 +25,18 @@ export default function Header() {
           <Clock className="w-6 h-6 text-amber-500" />
           <h1 className="text-lg font-semibold text-zinc-100">Time Tracker</h1>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-zinc-500">Today:</span>
-          <span className="timer-font text-amber-400 font-medium tabular-nums">{totalToday}</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onReportClick}
+            className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-1.5 px-3 transition-colors"
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Report
+          </button>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-zinc-500">Today:</span>
+            <span className="timer-font text-amber-400 font-medium tabular-nums">{totalToday}</span>
+          </div>
         </div>
       </div>
     </header>

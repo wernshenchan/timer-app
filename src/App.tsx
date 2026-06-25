@@ -1,15 +1,18 @@
+import { useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import Header from '@/components/Header';
 import AddProjectForm from '@/components/AddProjectForm';
 import ProjectCard from '@/components/ProjectCard';
 import DailyHistory from '@/components/DailyHistory';
+import ReportModal from '@/components/ReportModal';
 
 export default function App() {
   const projects = useTimeStore((s) => s.projects);
+  const [showReport, setShowReport] = useState(false);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <Header />
+      <Header onReportClick={() => setShowReport(true)} />
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
         <AddProjectForm />
 
@@ -27,6 +30,8 @@ export default function App() {
 
         <DailyHistory />
       </main>
+
+      {showReport && <ReportModal onClose={() => setShowReport(false)} />}
     </div>
   );
 }
