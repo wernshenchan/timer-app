@@ -13,14 +13,15 @@ export default function DailyHistory() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const todayEntries = timeEntries.filter((e) => e.date === todayStr);
+  const allEntries = [...timeEntries].sort((a, b) => b.endTime - a.endTime);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
-  if (todayEntries.length === 0 && !projects.some((p) => p.isRunning || p.isPaused)) {
+  if (todayEntries.length === 0 && timeEntries.length === 0 && !projects.some((p) => p.isRunning || p.isPaused)) {
     return null;
   }
 
-  // Group by project
+  // Group today's entries by project for today's summary
   const grouped: Record<string, { name: string; total: number; entries: TimeEntry[]; hasRunning: boolean }> = {};
 
   for (const entry of todayEntries) {
@@ -33,7 +34,7 @@ export default function DailyHistory() {
     grouped[entry.projectId].entries.push(entry);
   }
 
-  // Add running/paused projects
+  // Add running/paused projects to today's summary
   for (const p of projects) {
     if ((p.isRunning || p.isPaused) && p.sessionStartAt) {
       const running = p.isPaused && p.pausedAt
@@ -52,88 +53,95 @@ export default function DailyHistory() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
-  const entrySort = [...todayEntries].sort((a, b) => b.endTime - a.endTime);
+  const formatDateFull = (ts: number) => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   return (
     <>
       <div className="border-t border-zinc-800 pt-4 mt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <History className="w-4 h-4 text-zinc-500" />
-          <h2 className="text-sm font-medium text-zinc-500">Today's History</h2>
-        </div>
-
-        {/* Grouped summary */}
-        <div className="space-y-1 mb-3">
-          {Object.entries(grouped).map(([projectId, data]) => (
-            <div key={projectId}>
-              <button
-                onClick={() => setExpandedProject(expandedProject === projectId ? null : projectId)}
-                className="w-full flex items-center justify-between py-1.5 px-3 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
-              >
-                <div className="flex items-center gap-1.5">
-                  {expandedProject === projectId
-                    ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
-                    : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
-                  }
-                  <span className="text-zinc-300 text-sm">{data.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-zinc-600 text-xs">
-                    {data.entries.length} session{data.entries.length !== 1 ? 's' : ''}
-                    {data.hasRunning && ' · active'}
-                  </span>
-                  <span className="timer-font text-sm font-medium tabular-nums text-amber-400">
-                    {formatTime(data.total)}
-                  </span>
-                </div>
-              </button>
-
-              {/* Expandable session list */}
-              {expandedProject === projectId && data.entries.length > 0 && (
-                <div className="ml-5 mt-1 space-y-0.5">
-                  {data.entries
-                    .sort((a, b) => b.endTime - a.endTime)
-                    .map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group cursor-pointer"
-                        onClick={() => setEditingEntry(entry)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-xs text-zinc-500">
-                            <span>{formatSessionTime(entry.startTime)}</span>
-                            <span className="text-zinc-700">-</span>
-                            <span>{formatSessionTime(entry.endTime)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                              {formatTime(entry.durationSeconds)}
-                            </span>
-                            <span
-                              className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 hover:text-amber-400 transition-all"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </span>
-                          </div>
-                        </div>
-                        {entry.note && (
-                          <p className="text-xs text-zinc-500 mt-0.5 ml-0 truncate">{entry.note}</p>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              )}
+        {/* Today's summary */}
+        {Object.keys(grouped).length > 0 && (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <History className="w-4 h-4 text-zinc-500" />
+              <h2 className="text-sm font-medium text-zinc-500">Today's History</h2>
             </div>
-          ))}
-        </div>
 
-        {/* Compact chronological list */}
-        {entrySort.length > 0 && (
-          <div className="border-t border-zinc-800/50 pt-3 mt-3">
-            <h3 className="text-xs font-medium text-zinc-600 mb-2">All Sessions</h3>
+            <div className="space-y-1 mb-3">
+              {Object.entries(grouped).map(([projectId, data]) => (
+                <div key={projectId}>
+                  <button
+                    onClick={() => setExpandedProject(expandedProject === projectId ? null : projectId)}
+                    className="w-full flex items-center justify-between py-1.5 px-3 bg-zinc-900/30 rounded-lg hover:bg-zinc-900/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {expandedProject === projectId
+                        ? <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+                        : <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
+                      }
+                      <span className="text-zinc-300 text-sm">{data.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-600 text-xs">
+                        {data.entries.length} session{data.entries.length !== 1 ? 's' : ''}
+                        {data.hasRunning && ' · active'}
+                      </span>
+                      <span className="timer-font text-sm font-medium tabular-nums text-amber-400">
+                        {formatTime(data.total)}
+                      </span>
+                    </div>
+                  </button>
+
+                  {expandedProject === projectId && data.entries.length > 0 && (
+                    <div className="ml-5 mt-1 space-y-0.5">
+                      {data.entries
+                        .sort((a, b) => b.endTime - a.endTime)
+                        .map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="py-1 px-2 rounded-md hover:bg-zinc-800/30 transition-colors group cursor-pointer"
+                            onClick={() => setEditingEntry(entry)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                <span>{formatSessionTime(entry.startTime)}</span>
+                                <span className="text-zinc-700">-</span>
+                                <span>{formatSessionTime(entry.endTime)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="timer-font text-xs text-zinc-400 tabular-nums">
+                                  {formatTime(entry.durationSeconds)}
+                                </span>
+                                <span className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 transition-all">
+                                  <Pencil className="w-3 h-3" />
+                                </span>
+                              </div>
+                            </div>
+                            {entry.note && (
+                              <p className="text-xs text-zinc-500 mt-0.5 ml-0 truncate">{entry.note}</p>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ALL Sessions chronological */}
+        {allEntries.length > 0 && (
+          <div className={Object.keys(grouped).length > 0 ? 'border-t border-zinc-800/50 pt-3 mt-3' : ''}>
+            <h3 className="text-xs font-medium text-zinc-600 mb-2">
+              All Sessions ({allEntries.length})
+            </h3>
             <div className="space-y-0.5">
-              {entrySort.map((entry) => {
+              {allEntries.map((entry) => {
                 const project = projects.find((p) => p.id === entry.projectId);
+                const isToday = entry.date === todayStr;
                 return (
                   <div
                     key={entry.id}
@@ -146,6 +154,7 @@ export default function DailyHistory() {
                           {project?.name || 'Unknown'}
                         </span>
                         <span className="text-zinc-600 text-xs shrink-0">
+                          {isToday ? '' : `${formatDateFull(entry.startTime)} `}
                           {formatSessionTime(entry.startTime)} - {formatSessionTime(entry.endTime)}
                         </span>
                       </div>
