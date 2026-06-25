@@ -4,7 +4,9 @@ export interface Project {
   createdAt: number;
   totalTrackedSeconds: number;
   isRunning: boolean;
+  isPaused: boolean;
   sessionStartAt: number | null;
+  pausedAt: number | null;
 }
 
 export interface TimeEntry {

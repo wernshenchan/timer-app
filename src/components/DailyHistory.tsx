@@ -16,7 +16,7 @@ export default function DailyHistory() {
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
 
-  if (todayEntries.length === 0 && !projects.some((p) => p.isRunning)) {
+  if (todayEntries.length === 0 && !projects.some((p) => p.isRunning || p.isPaused)) {
     return null;
   }
 
@@ -33,10 +33,12 @@ export default function DailyHistory() {
     grouped[entry.projectId].entries.push(entry);
   }
 
-  // Add running projects
+  // Add running/paused projects
   for (const p of projects) {
-    if (p.isRunning && p.sessionStartAt) {
-      const running = Math.floor((Date.now() - p.sessionStartAt) / 1000);
+    if ((p.isRunning || p.isPaused) && p.sessionStartAt) {
+      const running = p.isPaused && p.pausedAt
+        ? Math.floor((p.pausedAt - p.sessionStartAt) / 1000)
+        : Math.floor((Date.now() - p.sessionStartAt) / 1000);
       if (!grouped[p.id]) {
         grouped[p.id] = { name: p.name, total: 0, entries: [], hasRunning: true };
       }
@@ -78,7 +80,7 @@ export default function DailyHistory() {
                 <div className="flex items-center gap-2">
                   <span className="text-zinc-600 text-xs">
                     {data.entries.length} session{data.entries.length !== 1 ? 's' : ''}
-                    {data.hasRunning && ' · running'}
+                    {data.hasRunning && ' · active'}
                   </span>
                   <span className="timer-font text-sm font-medium tabular-nums text-amber-400">
                     {formatTime(data.total)}
