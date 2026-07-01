@@ -5,7 +5,8 @@ import AddProjectForm from '@/components/AddProjectForm';
 import ProjectCard from '@/components/ProjectCard';
 import DailyHistory from '@/components/DailyHistory';
 import ReportModal from '@/components/ReportModal';
-import { Download, Upload, Eye, EyeOff } from 'lucide-react';
+import QuickAddModal from '@/components/QuickAddModal';
+import { Download, Upload, Eye, EyeOff, PlusCircle } from 'lucide-react';
 
 export default function App() {
   const projects = useTimeStore((s) => s.projects);
@@ -14,6 +15,7 @@ export default function App() {
   const autoStopPastSessions = useTimeStore((s) => s.autoStopPastSessions);
   const [showReport, setShowReport] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [importMsg, setImportMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,11 +33,18 @@ export default function App() {
     };
   }, [autoStopPastSessions]);
 
-  const visibleProjects = showArchived
+  const visibleProjects = (showArchived
     ? projects
-    : projects.filter((p) => !p.archived);
+    : projects.filter((p) => !p.archived)
+  ).sort((a, b) => {
+    // Pinned first, then by created date (newest last)
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return a.createdAt - b.createdAt;
+  });
 
   const archivedCount = projects.filter((p) => p.archived).length;
+  const hasActiveProjects = projects.some((p) => !p.archived);
 
   const handleExport = () => {
     const blob = new Blob([exportBackup()], { type: 'application/json' });
@@ -74,6 +83,15 @@ export default function App() {
         {/* Utility bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowQuickAdd(true)}
+              disabled={!hasActiveProjects}
+              className="flex items-center gap-1.5 text-xs bg-emerald-600/20 hover:bg-emerald-600/30 disabled:bg-zinc-800 disabled:text-zinc-600 text-emerald-400 rounded-lg py-1.5 px-3 transition-colors disabled:cursor-not-allowed"
+              title="Manually log a session"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              Quick Add
+            </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-3 transition-colors"
@@ -134,6 +152,7 @@ export default function App() {
       </main>
 
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
+      {showQuickAdd && <QuickAddModal onClose={() => setShowQuickAdd(false)} />}
     </div>
   );
 }

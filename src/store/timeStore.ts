@@ -10,10 +10,11 @@ function loadData(): AppData {
       const data = JSON.parse(raw);
       // Normalize old data without isPaused/pausedAt
       data.projects = (data.projects || []).map((p: Project) => ({
-        ...p,
-        isPaused: p.isPaused ?? false,
-        pausedAt: p.pausedAt ?? null,
-      }));
+          ...p,
+          isPaused: p.isPaused ?? false,
+          pausedAt: p.pausedAt ?? null,
+          pinned: p.pinned ?? false,
+        }));
       return data;
     }
   } catch {}
@@ -59,6 +60,7 @@ interface TimeStore {
   getTodayEntriesForProject: (projectId: string) => TimeEntry[];
   getTotalTodaySeconds: () => number;
   autoStopPastSessions: () => void;
+  addTimeEntry: (projectId: string, startTime: number, endTime: number, note?: string) => void;
   exportBackup: () => string;
   importBackup: (json: string) => boolean;
 }
@@ -82,6 +84,7 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         isPaused: false,
         sessionStartAt: null,
         pausedAt: null,
+        pinned: false,
       };
       set((state) => {
         const newState = { ...state, projects: [...state.projects, project] };
@@ -422,6 +425,33 @@ export const useTimeStore = create<TimeStore>((set, get) => {
       return entriesTotal + runningTotal;
     },
 
+    addTimeEntry: (projectId: string, startTime: number, endTime: number, note?: string) => {
+      set((state) => {
+        const entry: TimeEntry = {
+          id: generateId(),
+          projectId,
+          startTime,
+          endTime,
+          durationSeconds: Math.max(0, Math.floor((endTime - startTime) / 1000)),
+          date: getDateStr(endTime),
+          note: note?.trim() || undefined,
+        };
+        const newTimeEntries = [...state.timeEntries, entry];
+        const total = newTimeEntries
+          .filter((e) => e.projectId === projectId)
+          .reduce((sum, e) => sum + e.durationSeconds, 0);
+        const newState = {
+          ...state,
+          timeEntries: newTimeEntries,
+          projects: state.projects.map((p) =>
+            p.id === projectId ? { ...p, totalTrackedSeconds: total } : p
+          ),
+        };
+        saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
+        return newState;
+      });
+    },
+
     exportBackup: () => {
       const state = get();
       return JSON.stringify({ projects: state.projects, timeEntries: state.timeEntries }, null, 2);
@@ -443,6 +473,7 @@ export const useTimeStore = create<TimeStore>((set, get) => {
           pausedAt: (p.pausedAt as number) ?? null,
           color: p.color as string | undefined,
           archived: (p.archived as boolean) ?? false,
+          pinned: (p.pinned as boolean) ?? false,
         }));
         saveData({ projects: data.projects, timeEntries: data.timeEntries });
         set({ projects: data.projects, timeEntries: data.timeEntries });

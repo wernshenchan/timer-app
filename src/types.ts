@@ -9,6 +9,7 @@ export interface Project {
   pausedAt: number | null;
   color?: string;
   archived?: boolean;
+  pinned?: boolean;
 }
 
 export interface TimeEntry {

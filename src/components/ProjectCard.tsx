@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import { useRunningTimer, formatTime, formatTimeDecimal, formatTimeShort } from '@/hooks/useTimerDisplay';
 import { useSettings } from '@/hooks/useSettings';
 import TimeAdjustModal from './TimeAdjustModal';
 import ColorPicker from './ColorPicker';
-import { Play, Square, Pause, Clock, Trash2, Archive, ArchiveRestore } from 'lucide-react';
-import { PROJECT_COLORS } from '@/types';
+import {
+  Play, Square, Pause, Clock, Trash2, Archive, ArchiveRestore,
+  Pin, PinOff, Pencil
+} from 'lucide-react';
 
 interface Props {
   projectId: string;
@@ -17,6 +19,7 @@ export default function ProjectCard({ projectId }: Props) {
   const stopTimer = useTimeStore((s) => s.stopTimer);
   const pauseTimer = useTimeStore((s) => s.pauseTimer);
   const resumeTimer = useTimeStore((s) => s.resumeTimer);
+  const updateProject = useTimeStore((s) => s.updateProject);
   const archiveProject = useTimeStore((s) => s.archiveProject);
   const unarchiveProject = useTimeStore((s) => s.unarchiveProject);
   const deleteProject = useTimeStore((s) => s.deleteProject);
@@ -28,10 +31,20 @@ export default function ProjectCard({ projectId }: Props) {
   const [showAdjust, setShowAdjust] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const runningDisplay = useRunningTimer(projectId, decimalHours);
   const totalSeconds = getTotalSecondsForProject(projectId);
   const todayEntries = getTodayEntriesForProject(projectId);
+
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName]);
 
   if (!project) return null;
 
@@ -44,6 +57,19 @@ export default function ProjectCard({ projectId }: Props) {
   const totalDisplay = decimalHours ? formatTimeDecimal(totalSeconds) : formatTime(totalSeconds);
   const todayDisplay = formatTimeShort(todayTotal + todayRunning);
   const ativeDisplay = decimalHours ? formatTimeDecimal(totalSeconds) : runningDisplay;
+
+  const startRename = () => {
+    setNameDraft(project.name);
+    setEditingName(true);
+  };
+
+  const submitRename = () => {
+    const trimmed = nameDraft.trim();
+    if (trimmed && trimmed !== project.name) {
+      updateProject(projectId, { name: trimmed });
+    }
+    setEditingName(false);
+  };
 
   return (
     <>
@@ -59,7 +85,22 @@ export default function ProjectCard({ projectId }: Props) {
                 style={{ backgroundColor: project.color || '#3f3f46' }}
                 title="Change color"
               />
-              <h3 className="text-zinc-100 font-medium text-base truncate">{project.name}</h3>
+              {editingName ? (
+                <input
+                  ref={nameInputRef}
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onBlur={submitRename}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setEditingName(false); }}
+                  className="bg-zinc-800 border border-zinc-600 rounded px-2 py-0.5 text-zinc-100 text-base font-medium flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-amber-600/50"
+                  maxLength={50}
+                />
+              ) : (
+                <h3 className="text-zinc-100 font-medium text-base truncate">{project.name}</h3>
+              )}
+              {project.pinned && (
+                <Pin className="w-3 h-3 text-amber-500 shrink-0" />
+              )}
               {project.isPaused && (
                 <span className="text-amber-500/70 text-xs bg-amber-500/10 rounded-full px-2 py-0.5">Paused</span>
               )}
@@ -86,68 +127,46 @@ export default function ProjectCard({ projectId }: Props) {
           <div className="flex items-center gap-1.5 shrink-0">
             {project.isRunning ? (
               <>
-                <button
-                  onClick={() => setShowAdjust(true)}
+                <button onClick={() => setShowAdjust(true)}
                   className="p-2 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-all"
-                  title="Adjust start time"
-                >
-                  <Clock className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => pauseTimer(projectId)}
+                  title="Adjust start time"><Clock className="w-4 h-4" /></button>
+                <button onClick={() => pauseTimer(projectId)}
                   className="p-2 bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 rounded-lg transition-all"
-                  title="Pause"
-                >
-                  <Pause className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => stopTimer(projectId)}
+                  title="Pause"><Pause className="w-4 h-4" /></button>
+                <button onClick={() => stopTimer(projectId)}
                   className="p-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-all"
-                  title="End session"
-                >
-                  <Square className="w-4 h-4" />
-                </button>
+                  title="End session"><Square className="w-4 h-4" /></button>
               </>
             ) : project.isPaused ? (
               <>
-                <button
-                  onClick={() => resumeTimer(projectId)}
+                <button onClick={() => resumeTimer(projectId)}
                   className="p-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-lg transition-all"
-                  title="Resume"
-                >
-                  <Play className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => stopTimer(projectId)}
+                  title="Resume"><Play className="w-4 h-4" /></button>
+                <button onClick={() => stopTimer(projectId)}
                   className="p-2 bg-red-600/20 text-red-400 hover:bg-red-600/30 rounded-lg transition-all"
-                  title="End session"
-                >
-                  <Square className="w-4 h-4" />
-                </button>
+                  title="End session"><Square className="w-4 h-4" /></button>
               </>
             ) : (
               <>
-                <button
-                  onClick={() => startTimer(projectId)}
+                <button onClick={() => startTimer(projectId)}
                   className="p-2 bg-amber-600/20 text-amber-400 hover:bg-amber-600/30 rounded-lg transition-all"
-                  title="Start"
-                >
-                  <Play className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => project.archived ? unarchiveProject(projectId) : archiveProject(projectId)}
+                  title="Start"><Play className="w-4 h-4" /></button>
+                <button onClick={startRename}
+                  className="p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-all"
+                  title="Rename"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => updateProject(projectId, { pinned: !project.pinned })}
+                  className={`p-2 rounded-lg transition-all ${
+                    project.pinned
+                      ? 'text-amber-500 bg-amber-500/10 hover:bg-amber-500/20'
+                      : 'text-zinc-600 hover:text-amber-400 hover:bg-amber-600/10'
+                  }`}
+                  title={project.pinned ? 'Unpin' : 'Pin to top'}>{project.pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}</button>
+                <button onClick={() => project.archived ? unarchiveProject(projectId) : archiveProject(projectId)}
                   className="p-2 text-zinc-600 hover:text-amber-400 hover:bg-amber-600/10 rounded-lg transition-all"
-                  title={project.archived ? 'Unarchive' : 'Archive'}
-                >
-                  {project.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => setShowConfirmDelete(true)}
+                  title={project.archived ? 'Unarchive' : 'Archive'}>{project.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}</button>
+                <button onClick={() => setShowConfirmDelete(true)}
                   className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition-all"
-                  title="Delete project"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  title="Delete"><Trash2 className="w-4 h-4" /></button>
               </>
             )}
           </div>
@@ -180,27 +199,17 @@ export default function ProjectCard({ projectId }: Props) {
 
       {showConfirmDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowConfirmDelete(false)}>
-          <div
-            className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-sm shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
             <h3 className="text-zinc-100 font-semibold text-sm mb-2">Delete Project?</h3>
             <p className="text-zinc-400 text-xs mb-4">
               This will permanently delete <span className="text-zinc-200">{project.name}</span> and all its time entries.
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowConfirmDelete(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-2 text-sm transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { deleteProject(projectId); setShowConfirmDelete(false); }}
-                className="flex-1 bg-red-600 hover:bg-red-500 text-white rounded-lg py-2 text-sm transition-colors"
-              >
-                Delete
-              </button>
+              <button onClick={() => setShowConfirmDelete(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-2 text-sm transition-colors">Cancel</button>
+              <button onClick={() => { deleteProject(projectId); setShowConfirmDelete(false); }}
+                className="flex-1 bg-red-600 hover:bg-red-500 text-white rounded-lg py-2 text-sm transition-colors">Delete</button>
             </div>
           </div>
         </div>
