@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import Header from '@/components/Header';
 import AddProjectForm from '@/components/AddProjectForm';
@@ -8,7 +8,27 @@ import ReportModal from '@/components/ReportModal';
 
 export default function App() {
   const projects = useTimeStore((s) => s.projects);
+  const autoStopPastSessions = useTimeStore((s) => s.autoStopPastSessions);
   const [showReport, setShowReport] = useState(false);
+
+  // Auto-stop paused sessions from previous days
+  useEffect(() => {
+    autoStopPastSessions();
+
+    // Check every 30 seconds
+    const interval = setInterval(autoStopPastSessions, 30_000);
+
+    // Check on tab visibility change
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') autoStopPastSessions();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [autoStopPastSessions]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">

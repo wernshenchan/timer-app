@@ -28,9 +28,13 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function getToday(): string {
-  const d = new Date();
+function getDateStr(ts: number): string {
+  const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getToday(): string {
+  return getDateStr(Date.now());
 }
 
 interface TimeStore {
@@ -51,6 +55,7 @@ interface TimeStore {
   getTotalSecondsForProject: (projectId: string) => number;
   getTodayEntriesForProject: (projectId: string) => TimeEntry[];
   getTotalTodaySeconds: () => number;
+  autoStopPastSessions: () => void;
 }
 
 export const useTimeStore = create<TimeStore>((set, get) => {
@@ -143,7 +148,7 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         startTime: project.sessionStartAt,
         endTime,
         durationSeconds: elapsed,
-        date: getToday(),
+        date: getDateStr(endTime),
       };
 
       set((state) => {
@@ -306,6 +311,51 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         .reduce((sum, e) => sum + e.durationSeconds, 0);
       const running = get().getRunningSeconds(projectId);
       return entriesTotal + running;
+    },
+
+    autoStopPastSessions: () => {
+      const state = get();
+      const today = getToday();
+      const now = Date.now();
+      const newEntries: TimeEntry[] = [];
+      let changed = false;
+
+      const updatedProjects = state.projects.map((p) => {
+        if (!p.isPaused || !p.sessionStartAt || !p.pausedAt) return p;
+        const sessionDay = getDateStr(p.sessionStartAt);
+        // If paused on a previous day, auto-end the session
+        if (sessionDay !== today) {
+          const endTime = p.pausedAt;
+          const elapsed = Math.floor((endTime - p.sessionStartAt) / 1000);
+          newEntries.push({
+            id: generateId(),
+            projectId: p.id,
+            startTime: p.sessionStartAt,
+            endTime,
+            durationSeconds: elapsed,
+            date: sessionDay,
+          });
+          changed = true;
+          return {
+            ...p,
+            isRunning: false,
+            isPaused: false,
+            sessionStartAt: null,
+            pausedAt: null,
+            totalTrackedSeconds:
+              state.timeEntries
+                .filter((e) => e.projectId === p.id)
+                .reduce((sum, e) => sum + e.durationSeconds, 0) + elapsed,
+          };
+        }
+        return p;
+      });
+
+      if (changed) {
+        const newTimeEntries = [...state.timeEntries, ...newEntries];
+        saveData({ projects: updatedProjects, timeEntries: newTimeEntries });
+        set({ projects: updatedProjects, timeEntries: newTimeEntries });
+      }
     },
 
     getTodayEntriesForProject: (projectId: string) => {
