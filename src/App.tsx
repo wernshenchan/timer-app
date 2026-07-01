@@ -8,6 +8,7 @@ import DailyHistory from '@/components/DailyHistory';
 import ReportModal from '@/components/ReportModal';
 import QuickAddModal from '@/components/QuickAddModal';
 import { Download, Upload, Eye, EyeOff, PlusCircle, Timer } from 'lucide-react';
+import type { User } from '@supabase/supabase-js';
 
 function AppContent() {
   const projects = useTimeStore((s) => s.projects);
@@ -169,23 +170,36 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function AuthenticatedShell({ user }: { user: User }) {
   const init = useTimeStore((s) => s.init);
+  const loaded = useTimeStore((s) => s.loaded);
+  const [initialized, setInitialized] = useState(false);
 
+  useEffect(() => {
+    if (!initialized) {
+      setInitialized(true);
+      init(user.id);
+    }
+  }, [user.id, init, initialized]);
+
+  if (!loaded) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-zinc-500">
+          <Timer className="w-5 h-5 animate-pulse" />
+          <span className="text-sm">Loading data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return <AppContent />;
+}
+
+export default function App() {
   return (
     <AuthGuard>
-      {(user) => {
-        // Initialize store with user ID on mount
-        const [initialized, setInitialized] = useState(false);
-        useEffect(() => {
-          if (!initialized) {
-            setInitialized(true);
-            init(user.id);
-          }
-        }, [user.id, init, initialized]);
-
-        return <AppContent />;
-      }}
+      {(user) => <AuthenticatedShell user={user} />}
     </AuthGuard>
   );
 }
