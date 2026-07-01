@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
-import { formatTime } from '@/hooks/useTimerDisplay';
-import { Clock, BarChart3 } from 'lucide-react';
+import { formatTime, formatTimeDecimal } from '@/hooks/useTimerDisplay';
+import { useSettings } from '@/hooks/useSettings';
+import { Clock, BarChart3, Hash } from 'lucide-react';
 
 interface Props {
   onReportClick: () => void;
@@ -9,14 +10,18 @@ interface Props {
 
 export default function Header({ onReportClick }: Props) {
   const getTotalTodaySeconds = useTimeStore((s) => s.getTotalTodaySeconds);
+  const { decimalHours, update } = useSettings();
   const [totalToday, setTotalToday] = useState('00:00:00');
 
   useEffect(() => {
-    const update = () => setTotalToday(formatTime(getTotalTodaySeconds()));
-    update();
-    const interval = setInterval(update, 1000);
+    const updateDisplay = () => {
+      const secs = getTotalTodaySeconds();
+      setTotalToday(decimalHours ? formatTimeDecimal(secs) : formatTime(secs));
+    };
+    updateDisplay();
+    const interval = setInterval(updateDisplay, 1000);
     return () => clearInterval(interval);
-  }, [getTotalTodaySeconds]);
+  }, [getTotalTodaySeconds, decimalHours]);
 
   return (
     <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-10">
@@ -27,6 +32,18 @@ export default function Header({ onReportClick }: Props) {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => update({ decimalHours: !decimalHours })}
+            className={`flex items-center gap-1 text-xs rounded-lg py-1.5 px-2.5 transition-colors ${
+              decimalHours
+                ? 'bg-amber-600/20 text-amber-400'
+                : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+            }`}
+            title="Toggle decimal hours"
+          >
+            <Hash className="w-3 h-3" />
+            0.00h
+          </button>
+          <button
             onClick={onReportClick}
             className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg py-1.5 px-3 transition-colors"
           >
@@ -35,7 +52,7 @@ export default function Header({ onReportClick }: Props) {
           </button>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-zinc-500">Today:</span>
-            <span className="timer-font text-amber-400 font-medium tabular-nums">{totalToday}</span>
+            <span className={`font-medium tabular-nums text-amber-400 ${decimalHours ? 'text-sm' : 'timer-font'}`}>{totalToday}</span>
           </div>
         </div>
       </div>

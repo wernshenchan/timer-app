@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
-import { formatTime } from '@/hooks/useTimerDisplay';
+import { formatTime, formatTimeDecimal } from '@/hooks/useTimerDisplay';
+import { useSettings } from '@/hooks/useSettings';
 import { X } from 'lucide-react';
 import type { TimeEntry } from '@/types';
 
@@ -14,6 +15,7 @@ export default function SessionEditModal({ entry, projectName, onClose }: Props)
   const editTimeEntry = useTimeStore((s) => s.editTimeEntry);
   const setEntryNote = useTimeStore((s) => s.setEntryNote);
   const deleteTimeEntry = useTimeStore((s) => s.deleteTimeEntry);
+  const { decimalHours } = useSettings();
 
   const startDate = new Date(entry.startTime);
   const endDate = new Date(entry.endTime);
@@ -87,8 +89,8 @@ export default function SessionEditModal({ entry, projectName, onClose }: Props)
 
           <div className="flex items-center justify-center py-2 bg-zinc-800/50 rounded-lg">
             <span className="text-zinc-500 text-xs mr-2">Duration:</span>
-            <span className="timer-font text-amber-400 font-medium tabular-nums text-sm">
-              {formatTime(newDuration)}
+            <span className={`tabular-nums text-amber-400 font-medium text-sm ${decimalHours ? '' : 'timer-font'}`}>
+              {decimalHours ? formatTimeDecimal(newDuration) : formatTime(newDuration)}
             </span>
           </div>
 

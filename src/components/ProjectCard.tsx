@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
-import { useRunningTimer, formatTime, formatTimeShort } from '@/hooks/useTimerDisplay';
+import { useRunningTimer, formatTime, formatTimeDecimal, formatTimeShort } from '@/hooks/useTimerDisplay';
+import { useSettings } from '@/hooks/useSettings';
 import TimeAdjustModal from './TimeAdjustModal';
-import { Play, Square, Pause, Clock, Trash2 } from 'lucide-react';
+import ColorPicker from './ColorPicker';
+import { Play, Square, Pause, Clock, Trash2, Archive, ArchiveRestore } from 'lucide-react';
+import { PROJECT_COLORS } from '@/types';
 
 interface Props {
   projectId: string;
@@ -14,15 +17,19 @@ export default function ProjectCard({ projectId }: Props) {
   const stopTimer = useTimeStore((s) => s.stopTimer);
   const pauseTimer = useTimeStore((s) => s.pauseTimer);
   const resumeTimer = useTimeStore((s) => s.resumeTimer);
+  const archiveProject = useTimeStore((s) => s.archiveProject);
+  const unarchiveProject = useTimeStore((s) => s.unarchiveProject);
   const deleteProject = useTimeStore((s) => s.deleteProject);
   const getTotalSecondsForProject = useTimeStore((s) => s.getTotalSecondsForProject);
   const getTodayEntriesForProject = useTimeStore((s) => s.getTodayEntriesForProject);
 
   const project = projects.find((p) => p.id === projectId);
+  const { decimalHours } = useSettings();
   const [showAdjust, setShowAdjust] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
-  const runningDisplay = useRunningTimer(projectId);
+  const runningDisplay = useRunningTimer(projectId, decimalHours);
   const totalSeconds = getTotalSecondsForProject(projectId);
   const todayEntries = getTodayEntriesForProject(projectId);
 
@@ -34,6 +41,9 @@ export default function ProjectCard({ projectId }: Props) {
     : 0;
 
   const isActive = project.isRunning || project.isPaused;
+  const totalDisplay = decimalHours ? formatTimeDecimal(totalSeconds) : formatTime(totalSeconds);
+  const todayDisplay = formatTimeShort(todayTotal + todayRunning);
+  const ativeDisplay = decimalHours ? formatTimeDecimal(totalSeconds) : runningDisplay;
 
   return (
     <>
@@ -43,6 +53,12 @@ export default function ProjectCard({ projectId }: Props) {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowColorPicker(!showColorPicker)}
+                className="w-3 h-3 rounded-full shrink-0 border border-zinc-700 hover:scale-125 transition-transform"
+                style={{ backgroundColor: project.color || '#3f3f46' }}
+                title="Change color"
+              />
               <h3 className="text-zinc-100 font-medium text-base truncate">{project.name}</h3>
               {project.isPaused && (
                 <span className="text-amber-500/70 text-xs bg-amber-500/10 rounded-full px-2 py-0.5">Paused</span>
@@ -50,9 +66,22 @@ export default function ProjectCard({ projectId }: Props) {
               {project.isRunning && (
                 <span className="text-emerald-400/70 text-xs bg-emerald-400/10 rounded-full px-2 py-0.5">Running</span>
               )}
+              {project.archived && (
+                <span className="text-zinc-500 text-xs bg-zinc-800 rounded-full px-2 py-0.5">Archived</span>
+              )}
             </div>
-            <p className="text-zinc-500 text-xs mt-0.5">Total: {formatTimeShort(totalSeconds)}</p>
+            <div className="text-zinc-500 text-xs mt-0.5">
+              Total: {totalDisplay}
+            </div>
           </div>
+
+          {showColorPicker && (
+            <ColorPicker
+              projectId={projectId}
+              currentColor={project.color}
+              onClose={() => setShowColorPicker(false)}
+            />
+          )}
 
           <div className="flex items-center gap-1.5 shrink-0">
             {project.isRunning ? (
@@ -106,6 +135,13 @@ export default function ProjectCard({ projectId }: Props) {
                   <Play className="w-4 h-4" />
                 </button>
                 <button
+                  onClick={() => project.archived ? unarchiveProject(projectId) : archiveProject(projectId)}
+                  className="p-2 text-zinc-600 hover:text-amber-400 hover:bg-amber-600/10 rounded-lg transition-all"
+                  title={project.archived ? 'Unarchive' : 'Archive'}
+                >
+                  {project.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                </button>
+                <button
                   onClick={() => setShowConfirmDelete(true)}
                   className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-600/10 rounded-lg transition-all"
                   title="Delete project"
@@ -118,14 +154,16 @@ export default function ProjectCard({ projectId }: Props) {
         </div>
 
         <div className="mt-3 flex items-baseline justify-between">
-          <span className={`timer-font text-2xl font-bold tabular-nums ${
+          <span className={`font-bold tabular-nums ${
+            decimalHours ? 'text-lg' : 'timer-font text-2xl'
+          } ${
             project.isRunning ? 'text-amber-400' : project.isPaused ? 'text-amber-500/70' : 'text-zinc-400'
           }`}>
-            {isActive ? runningDisplay : formatTime(totalSeconds)}
+            {isActive ? ativeDisplay : totalDisplay}
           </span>
           {todayTotal + todayRunning > 0 && (
             <span className="text-xs text-zinc-600">
-              Today: {formatTimeShort(todayTotal + todayRunning)}
+              Today: {todayDisplay}
             </span>
           )}
         </div>

@@ -1,34 +1,69 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import Header from '@/components/Header';
 import AddProjectForm from '@/components/AddProjectForm';
 import ProjectCard from '@/components/ProjectCard';
 import DailyHistory from '@/components/DailyHistory';
 import ReportModal from '@/components/ReportModal';
+import { Download, Upload, Eye, EyeOff } from 'lucide-react';
 
 export default function App() {
   const projects = useTimeStore((s) => s.projects);
+  const exportBackup = useTimeStore((s) => s.exportBackup);
+  const importBackup = useTimeStore((s) => s.importBackup);
   const autoStopPastSessions = useTimeStore((s) => s.autoStopPastSessions);
   const [showReport, setShowReport] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-stop paused sessions from previous days
   useEffect(() => {
     autoStopPastSessions();
-
-    // Check every 30 seconds
     const interval = setInterval(autoStopPastSessions, 30_000);
-
-    // Check on tab visibility change
     const onVisibility = () => {
       if (document.visibilityState === 'visible') autoStopPastSessions();
     };
     document.addEventListener('visibilitychange', onVisibility);
-
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [autoStopPastSessions]);
+
+  const visibleProjects = showArchived
+    ? projects
+    : projects.filter((p) => !p.archived);
+
+  const archivedCount = projects.filter((p) => p.archived).length;
+
+  const handleExport = () => {
+    const blob = new Blob([exportBackup()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      if (importBackup(text)) {
+        setImportMsg('Backup restored successfully!');
+        setTimeout(() => setImportMsg(''), 3000);
+      } else {
+        setImportMsg('Invalid backup file.');
+        setTimeout(() => setImportMsg(''), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -36,13 +71,60 @@ export default function App() {
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
         <AddProjectForm />
 
-        {projects.length === 0 ? (
+        {/* Utility bar */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-3 transition-colors"
+              title="Download backup"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Backup
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-3 transition-colors"
+              title="Restore from backup"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Restore
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="hidden"
+            />
+            {importMsg && (
+              <span className={`text-xs ${importMsg.includes('success') ? 'text-emerald-400' : 'text-red-400'}`}>
+                {importMsg}
+              </span>
+            )}
+          </div>
+          {archivedCount > 0 && (
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="flex items-center gap-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-3 transition-colors"
+            >
+              {showArchived ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              {showArchived ? 'Hide Archived' : `Archived (${archivedCount})`}
+            </button>
+          )}
+        </div>
+
+        {visibleProjects.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-zinc-600 text-sm">No projects yet. Add one above to start tracking time.</p>
+            <p className="text-zinc-600 text-sm">
+              {archivedCount > 0 && !showArchived
+                ? 'All projects are archived. Click "Archived" to show them.'
+                : 'No projects yet. Add one above to start tracking time.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {projects.map((project) => (
+            {visibleProjects.map((project) => (
               <ProjectCard key={project.id} projectId={project.id} />
             ))}
           </div>

@@ -1,5 +1,6 @@
 import { useTimeStore } from '@/store/timeStore';
-import { formatTime } from '@/hooks/useTimerDisplay';
+import { formatTime, formatTimeDecimal } from '@/hooks/useTimerDisplay';
+import { useSettings } from '@/hooks/useSettings';
 import { X, Copy, Check, ChevronDown, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 
@@ -10,20 +11,28 @@ interface Props {
 export default function ReportModal({ onClose }: Props) {
   const projects = useTimeStore((s) => s.projects);
   const timeEntries = useTimeStore((s) => s.timeEntries);
+  const { decimalHours } = useSettings();
   const [copied, setCopied] = useState(false);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [filterProjectId, setFilterProjectId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-  // Filter entries by selected project
-  const filteredEntries = filterProjectId
-    ? timeEntries.filter((e) => e.projectId === filterProjectId)
-    : timeEntries;
+  const fmt = (secs: number) => decimalHours ? formatTimeDecimal(secs) : formatTime(secs);
 
-  // Build report data filtered by project
+  // Filter entries by project + date range
+  const filteredEntries = timeEntries.filter((e) => {
+    if (filterProjectId && e.projectId !== filterProjectId) return false;
+    if (dateFrom && e.date < dateFrom) return false;
+    if (dateTo && e.date > dateTo) return false;
+    return true;
+  });
+
+  // Build report data
   const reportData = projects
     .map((p) => {
       if (filterProjectId && p.id !== filterProjectId) return null;
-      const entries = timeEntries.filter((e) => e.projectId === p.id).sort((a, b) => b.endTime - a.endTime);
+      const entries = filteredEntries.filter((e) => e.projectId === p.id).sort((a, b) => b.endTime - a.endTime);
       const totalSec = entries.reduce((sum, e) => sum + e.durationSeconds, 0);
       const runningSec = (p.isRunning || p.isPaused) && p.sessionStartAt
         ? Math.floor((Date.now() - p.sessionStartAt) / 1000)
@@ -45,6 +54,8 @@ export default function ReportModal({ onClose }: Props) {
     ? projects.find((p) => p.id === filterProjectId)?.name || 'Unknown'
     : 'All Projects';
 
+  const hasDateFilter = dateFrom || dateTo;
+
   const formatTimestamp = (ts: number) => {
     const d = new Date(ts);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -57,10 +68,13 @@ export default function ReportModal({ onClose }: Props) {
 
     let text = `TIME TRACKING REPORT\n`;
     text += `Project: ${filterLabel}\n`;
+    if (hasDateFilter) {
+      text += `Date range: ${dateFrom || 'start'} → ${dateTo || 'end'}\n`;
+    }
     text += `Generated: ${dateStr} at ${timeStr}\n`;
     text += `${'─'.repeat(50)}\n\n`;
     text += `OVERVIEW\n`;
-    text += `  Total time tracked:  ${formatTime(overallTotal)}\n`;
+    text += `  Total time tracked:  ${fmt(overallTotal)}\n`;
     text += `  Total sessions:      ${totalSessions}\n`;
     text += `  Days with activity:  ${totalDays}\n`;
     if (!filterProjectId) {
@@ -73,7 +87,7 @@ export default function ReportModal({ onClose }: Props) {
       text += `${'─'.repeat(50)}\n`;
       for (const d of reportData) {
         text += `\n  ${d.project.name}\n`;
-        text += `    Time:     ${formatTime(d.totalSec)}\n`;
+        text += `    Time:     ${fmt(d.totalSec)}\n`;
         text += `    Sessions: ${d.entries.length}\n`;
         text += `    Days:     ${d.uniqueDays}\n`;
         if (d.lastEntry) {
@@ -86,18 +100,17 @@ export default function ReportModal({ onClose }: Props) {
           for (const e of entriesWithNotes) {
             const datePart = formatTimestamp(e.startTime).split(' ')[0];
             const startTimePart = formatTimestamp(e.startTime).split(' ')[1];
-            text += `      ${datePart} ${startTimePart} (${formatTime(e.durationSeconds)}): ${e.note}\n`;
+            text += `      ${datePart} ${startTimePart} (${fmt(e.durationSeconds)}): ${e.note}\n`;
           }
         }
 
-        // List all sessions when filtering by project
         if (filterProjectId && d.entries.length > 0) {
           text += `    Sessions:\n`;
           for (const e of d.entries) {
             const datePart = formatTimestamp(e.startTime).split(' ')[0];
             const startTimePart = formatTimestamp(e.startTime).split(' ')[1];
             const endTimePart = formatTimestamp(e.endTime).split(' ')[1];
-            text += `      ${datePart} ${startTimePart} - ${endTimePart} (${formatTime(e.durationSeconds)})`;
+            text += `      ${datePart} ${startTimePart} - ${endTimePart} (${fmt(e.durationSeconds)})`;
             if (e.note) text += `: ${e.note}`;
             text += `\n`;
           }
@@ -123,10 +136,11 @@ export default function ReportModal({ onClose }: Props) {
 
     const rows: string[][] = [];
     rows.push([csvEscape(`Time Tracking Report — ${filterLabel}`)]);
+    if (hasDateFilter) rows.push([csvEscape(`Date range: ${dateFrom || 'start'} → ${dateTo || 'end'}`)]);
     rows.push([csvEscape(`Generated: ${dateStr}`)]);
     rows.push([]);
     rows.push(['Overview']);
-    rows.push(['Total Time', formatTime(overallTotal)]);
+    rows.push(['Total Time', fmt(overallTotal)]);
     rows.push(['Total Sessions', String(totalSessions)]);
     rows.push(['Active Days', String(totalDays)]);
     if (!filterProjectId) rows.push(['Projects Tracked', String(reportData.length)]);
@@ -145,7 +159,7 @@ export default function ReportModal({ onClose }: Props) {
           dateCol,
           startCol,
           endCol,
-          formatTime(e.durationSeconds),
+          fmt(e.durationSeconds),
           csvEscape(e.note || ''),
         ]);
       }
@@ -164,7 +178,7 @@ export default function ReportModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl"
+        className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
@@ -190,8 +204,8 @@ export default function ReportModal({ onClose }: Props) {
           </div>
         </div>
 
-        {/* Project filter */}
-        <div className="mb-4">
+        {/* Project + Date filters */}
+        <div className="mb-3 space-y-2">
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => { setFilterProjectId(null); setExpandedProject(null); }}
@@ -219,12 +233,37 @@ export default function ReportModal({ onClose }: Props) {
                 </button>
               ))}
           </div>
+          <div className="flex gap-2 items-center">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-600/50"
+              placeholder="From"
+            />
+            <span className="text-zinc-600 text-xs">→</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-zinc-100 text-xs focus:outline-none focus:ring-2 focus:ring-amber-600/50"
+              placeholder="To"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-2 transition-colors"
+              >
+                X
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Overview */}
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-            <div className="timer-font text-xl font-bold text-amber-400 tabular-nums">{formatTime(overallTotal)}</div>
+            <div className={`font-bold text-amber-400 tabular-nums ${decimalHours ? 'text-lg' : 'timer-font text-xl'}`}>{fmt(overallTotal)}</div>
             <div className="text-zinc-500 text-xs mt-0.5">Total Time</div>
           </div>
           <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
@@ -252,7 +291,7 @@ export default function ReportModal({ onClose }: Props) {
 
         {/* Per-project breakdown */}
         {reportData.length === 0 ? (
-          <p className="text-zinc-600 text-sm text-center py-4">No time tracked yet.</p>
+          <p className="text-zinc-600 text-sm text-center py-4">No sessions match your filters.</p>
         ) : (
           <div>
             <h4 className="text-xs font-medium text-zinc-500 mb-2">
@@ -267,18 +306,19 @@ export default function ReportModal({ onClose }: Props) {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {filterProjectId
-                          ? null
-                          : expandedProject === d.project.id
+                        {!filterProjectId && (
+                          expandedProject === d.project.id
                             ? <ChevronDown className="w-3 h-3 text-zinc-500 shrink-0" />
                             : <ChevronRight className="w-3 h-3 text-zinc-500 shrink-0" />
-                        }
-                        <span className="text-zinc-200 text-sm font-medium truncate">
-                          {filterProjectId ? d.project.name : d.project.name}
+                        )}
+                        <span
+                          className="text-zinc-200 text-sm font-medium truncate"
+                        >
+                          {d.project.name}
                         </span>
                       </div>
-                      <span className="timer-font text-sm text-amber-400 font-medium tabular-nums shrink-0 ml-2">
-                        {formatTime(d.totalSec)}
+                      <span className={`font-medium tabular-nums text-amber-400 shrink-0 ml-2 ${decimalHours ? 'text-sm' : 'timer-font text-sm'}`}>
+                        {fmt(d.totalSec)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-zinc-500 mt-1 ml-4">
@@ -290,7 +330,6 @@ export default function ReportModal({ onClose }: Props) {
                     </div>
                   </button>
 
-                  {/* Expanded session list */}
                   {(expandedProject === d.project.id || filterProjectId) && (
                     <div className="ml-5 mt-1 space-y-1">
                       {d.entries.map((entry) => (
@@ -299,8 +338,8 @@ export default function ReportModal({ onClose }: Props) {
                             <span className="text-xs text-zinc-500">
                               {formatTimestamp(entry.startTime)} - {formatTimestamp(entry.endTime).split(' ')[1]}
                             </span>
-                            <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                              {formatTime(entry.durationSeconds)}
+                            <span className={`text-xs text-zinc-400 tabular-nums ${decimalHours ? '' : 'timer-font'}`}>
+                              {fmt(entry.durationSeconds)}
                             </span>
                           </div>
                           {entry.note && (

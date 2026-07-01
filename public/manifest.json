@@ -1,0 +1,24 @@
+{
+  "name": "Time Tracker",
+  "short_name": "Tracker",
+  "description": "Simple time tracking for personal projects",
+  "start_url": "/timer-app/",
+  "scope": "/timer-app/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#f59e0b",
+  "icons": [
+    {
+      "src": "/timer-app/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/timer-app/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

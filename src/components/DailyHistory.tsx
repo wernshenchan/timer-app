@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
-import { formatTime } from '@/hooks/useTimerDisplay';
+import { formatTime, formatTimeDecimal } from '@/hooks/useTimerDisplay';
+import { useSettings } from '@/hooks/useSettings';
 import SessionEditModal from './SessionEditModal';
-import { History, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { History, ChevronDown, ChevronRight, Pencil, Search, X } from 'lucide-react';
 import type { TimeEntry } from '@/types';
 
 export default function DailyHistory() {
   const projects = useTimeStore((s) => s.projects);
   const timeEntries = useTimeStore((s) => s.timeEntries);
+  const { decimalHours } = useSettings();
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -16,15 +18,26 @@ export default function DailyHistory() {
   const allEntries = [...timeEntries].sort((a, b) => b.endTime - a.endTime);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   if (todayEntries.length === 0 && timeEntries.length === 0 && !projects.some((p) => p.isRunning || p.isPaused)) {
     return null;
   }
 
-  // Group today's entries by project for today's summary
+  const fmt = (secs: number) => decimalHours ? formatTimeDecimal(secs) : formatTime(secs);
+
+  // Filter sessions by note search
+  const filteredAllEntries = searchQuery.trim()
+    ? allEntries.filter((e) => (e.note || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : allEntries;
+  const filteredTodayEntries = searchQuery.trim()
+    ? todayEntries.filter((e) => (e.note || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : todayEntries;
+
+  // Group today's entries by project
   const grouped: Record<string, { name: string; total: number; entries: TimeEntry[]; hasRunning: boolean }> = {};
 
-  for (const entry of todayEntries) {
+  for (const entry of filteredTodayEntries) {
     const project = projects.find((p) => p.id === entry.projectId);
     const name = project?.name || 'Unknown';
     if (!grouped[entry.projectId]) {
@@ -34,7 +47,6 @@ export default function DailyHistory() {
     grouped[entry.projectId].entries.push(entry);
   }
 
-  // Add running/paused projects to today's summary
   for (const p of projects) {
     if ((p.isRunning || p.isPaused) && p.sessionStartAt) {
       const running = p.isPaused && p.pausedAt
@@ -61,8 +73,28 @@ export default function DailyHistory() {
   return (
     <>
       <div className="border-t border-zinc-800 pt-4 mt-4">
+        {/* Search bar */}
+        <div className="relative mb-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search sessions by note..."
+            className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg pl-8 pr-8 py-1.5 text-zinc-100 text-xs placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-amber-600/50 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
         {/* Today's summary */}
-        {Object.keys(grouped).length > 0 && (
+        {Object.keys(grouped).length > 0 && !searchQuery.trim() && (
           <>
             <div className="flex items-center gap-2 mb-3">
               <History className="w-4 h-4 text-zinc-500" />
@@ -88,8 +120,8 @@ export default function DailyHistory() {
                         {data.entries.length} session{data.entries.length !== 1 ? 's' : ''}
                         {data.hasRunning && ' · active'}
                       </span>
-                      <span className="timer-font text-sm font-medium tabular-nums text-amber-400">
-                        {formatTime(data.total)}
+                      <span className={`font-medium tabular-nums text-amber-400 ${decimalHours ? 'text-sm' : 'timer-font text-sm'}`}>
+                        {fmt(data.total)}
                       </span>
                     </div>
                   </button>
@@ -111,8 +143,8 @@ export default function DailyHistory() {
                                 <span>{formatSessionTime(entry.endTime)}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                                  {formatTime(entry.durationSeconds)}
+                                <span className={`text-xs text-zinc-400 tabular-nums ${decimalHours ? '' : 'timer-font'}`}>
+                                  {fmt(entry.durationSeconds)}
                                 </span>
                                 <span className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 transition-all">
                                   <Pencil className="w-3 h-3" />
@@ -132,14 +164,17 @@ export default function DailyHistory() {
           </>
         )}
 
-        {/* ALL Sessions chronological */}
-        {allEntries.length > 0 && (
-          <div className={Object.keys(grouped).length > 0 ? 'border-t border-zinc-800/50 pt-3 mt-3' : ''}>
+        {/* All Sessions */}
+        {filteredAllEntries.length > 0 && (
+          <div className={Object.keys(grouped).length > 0 && !searchQuery.trim() ? 'border-t border-zinc-800/50 pt-3 mt-3' : ''}>
             <h3 className="text-xs font-medium text-zinc-600 mb-2">
-              All Sessions ({allEntries.length})
+              {searchQuery.trim()
+                ? `Matching Sessions (${filteredAllEntries.length})`
+                : `All Sessions (${filteredAllEntries.length})`
+              }
             </h3>
             <div className="space-y-0.5">
-              {allEntries.map((entry) => {
+              {filteredAllEntries.map((entry) => {
                 const project = projects.find((p) => p.id === entry.projectId);
                 const isToday = entry.date === todayStr;
                 return (
@@ -159,8 +194,8 @@ export default function DailyHistory() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="timer-font text-xs text-zinc-400 tabular-nums">
-                          {formatTime(entry.durationSeconds)}
+                        <span className={`text-xs text-zinc-400 tabular-nums ${decimalHours ? '' : 'timer-font'}`}>
+                          {fmt(entry.durationSeconds)}
                         </span>
                         <span className="opacity-0 group-hover:opacity-100 p-0.5 text-zinc-600 transition-all">
                           <Pencil className="w-3 h-3" />
@@ -175,6 +210,10 @@ export default function DailyHistory() {
               })}
             </div>
           </div>
+        )}
+
+        {searchQuery.trim() && filteredAllEntries.length === 0 && filteredTodayEntries.length === 0 && (
+          <p className="text-zinc-600 text-xs text-center py-4">No sessions match your search.</p>
         )}
       </div>
 

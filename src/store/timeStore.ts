@@ -43,6 +43,9 @@ interface TimeStore {
   addProject: (name: string) => void;
   deleteProject: (id: string) => void;
   renameProject: (id: string, name: string) => void;
+  updateProject: (id: string, changes: Partial<Project>) => void;
+  archiveProject: (id: string) => void;
+  unarchiveProject: (id: string) => void;
   startTimer: (projectId: string) => void;
   stopTimer: (projectId: string) => void;
   pauseTimer: (projectId: string) => void;
@@ -56,6 +59,8 @@ interface TimeStore {
   getTodayEntriesForProject: (projectId: string) => TimeEntry[];
   getTotalTodaySeconds: () => number;
   autoStopPastSessions: () => void;
+  exportBackup: () => string;
+  importBackup: (json: string) => boolean;
 }
 
 export const useTimeStore = create<TimeStore>((set, get) => {
@@ -105,6 +110,45 @@ export const useTimeStore = create<TimeStore>((set, get) => {
           ...state,
           projects: state.projects.map((p) =>
             p.id === id ? { ...p, name: trimmed } : p
+          ),
+        };
+        saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
+        return newState;
+      });
+    },
+
+    updateProject: (id: string, changes: Partial<Project>) => {
+      set((state) => {
+        const newState = {
+          ...state,
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, ...changes } : p
+          ),
+        };
+        saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
+        return newState;
+      });
+    },
+
+    archiveProject: (id: string) => {
+      set((state) => {
+        const newState = {
+          ...state,
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, archived: true } : p
+          ),
+        };
+        saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
+        return newState;
+      });
+    },
+
+    unarchiveProject: (id: string) => {
+      set((state) => {
+        const newState = {
+          ...state,
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, archived: false } : p
           ),
         };
         saveData({ projects: newState.projects, timeEntries: newState.timeEntries });
@@ -376,6 +420,36 @@ export const useTimeStore = create<TimeStore>((set, get) => {
         .filter((p) => (p.isRunning || p.isPaused) && p.sessionStartAt)
         .reduce((sum, p) => sum + get().getRunningSeconds(p.id), 0);
       return entriesTotal + runningTotal;
+    },
+
+    exportBackup: () => {
+      const state = get();
+      return JSON.stringify({ projects: state.projects, timeEntries: state.timeEntries }, null, 2);
+    },
+
+    importBackup: (json: string) => {
+      try {
+        const data = JSON.parse(json);
+        if (!data.projects || !data.timeEntries) return false;
+        // Normalize imported data
+        data.projects = data.projects.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          name: p.name as string,
+          createdAt: p.createdAt as number,
+          totalTrackedSeconds: p.totalTrackedSeconds as number,
+          isRunning: p.isRunning as boolean,
+          isPaused: (p.isPaused as boolean) ?? false,
+          sessionStartAt: (p.sessionStartAt as number) ?? null,
+          pausedAt: (p.pausedAt as number) ?? null,
+          color: p.color as string | undefined,
+          archived: (p.archived as boolean) ?? false,
+        }));
+        saveData({ projects: data.projects, timeEntries: data.timeEntries });
+        set({ projects: data.projects, timeEntries: data.timeEntries });
+        return true;
+      } catch {
+        return false;
+      }
     },
   };
 });
