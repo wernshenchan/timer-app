@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTimeStore } from '@/store/timeStore';
+import AuthGuard from '@/components/AuthGuard';
 import Header from '@/components/Header';
 import AddProjectForm from '@/components/AddProjectForm';
 import ProjectCard from '@/components/ProjectCard';
 import DailyHistory from '@/components/DailyHistory';
 import ReportModal from '@/components/ReportModal';
 import QuickAddModal from '@/components/QuickAddModal';
-import { Download, Upload, Eye, EyeOff, PlusCircle } from 'lucide-react';
+import { Download, Upload, Eye, EyeOff, PlusCircle, Timer } from 'lucide-react';
 
-export default function App() {
+function AppContent() {
   const projects = useTimeStore((s) => s.projects);
+  const loaded = useTimeStore((s) => s.loaded);
   const exportBackup = useTimeStore((s) => s.exportBackup);
   const importBackup = useTimeStore((s) => s.importBackup);
   const autoStopPastSessions = useTimeStore((s) => s.autoStopPastSessions);
@@ -33,11 +35,21 @@ export default function App() {
     };
   }, [autoStopPastSessions]);
 
+  if (!loaded) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-zinc-500">
+          <Timer className="w-5 h-5 animate-pulse" />
+          <span className="text-sm">Loading data...</span>
+        </div>
+      </div>
+    );
+  }
+
   const visibleProjects = (showArchived
     ? projects
     : projects.filter((p) => !p.archived)
   ).sort((a, b) => {
-    // Pinned first, then by created date (newest last)
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     return a.createdAt - b.createdAt;
@@ -154,5 +166,26 @@ export default function App() {
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
       {showQuickAdd && <QuickAddModal onClose={() => setShowQuickAdd(false)} />}
     </div>
+  );
+}
+
+export default function App() {
+  const init = useTimeStore((s) => s.init);
+
+  return (
+    <AuthGuard>
+      {(user) => {
+        // Initialize store with user ID on mount
+        const [initialized, setInitialized] = useState(false);
+        useEffect(() => {
+          if (!initialized) {
+            setInitialized(true);
+            init(user.id);
+          }
+        }, [user.id, init, initialized]);
+
+        return <AppContent />;
+      }}
+    </AuthGuard>
   );
 }
