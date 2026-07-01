@@ -1,10 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import { LogIn, LogOut, Github, Timer } from 'lucide-react';
+import { Github, Timer } from 'lucide-react';
+
+export interface AuthGuardRenderProps {
+  user: User;
+  onLogout: () => Promise<void>;
+}
 
 interface AuthGuardProps {
-  children: (user: User) => ReactNode;
+  children: (props: AuthGuardRenderProps) => ReactNode;
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
@@ -75,16 +80,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   return (
     <>
-      {/* Logout button — fixed top-right corner */}
-      <button
-        onClick={handleLogout}
-        className="fixed top-3 right-3 z-50 flex items-center gap-1.5 text-xs bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 rounded-lg py-1.5 px-3 transition-colors"
-        title="Sign out"
-      >
-        <LogOut className="w-3.5 h-3.5" />
-        Sign out
-      </button>
-      {children(user)}
+      {children({ user, onLogout: handleLogout })}
     </>
   );
 }

@@ -10,7 +10,7 @@ import QuickAddModal from '@/components/QuickAddModal';
 import { Download, Upload, Eye, EyeOff, PlusCircle, Timer } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
-function AppContent() {
+function AppContent({ onLogout }: { onLogout: () => void }) {
   const projects = useTimeStore((s) => s.projects);
   const loaded = useTimeStore((s) => s.loaded);
   const exportBackup = useTimeStore((s) => s.exportBackup);
@@ -89,7 +89,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <Header onReportClick={() => setShowReport(true)} />
+      <Header onReportClick={() => setShowReport(true)} onLogout={onLogout} />
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
         <AddProjectForm />
 
@@ -170,7 +170,7 @@ function AppContent() {
   );
 }
 
-function AuthenticatedShell({ user }: { user: User }) {
+function AuthenticatedShell({ user, onLogout }: { user: User; onLogout: () => void }) {
   const init = useTimeStore((s) => s.init);
   const loaded = useTimeStore((s) => s.loaded);
   const [initialized, setInitialized] = useState(false);
@@ -193,13 +193,13 @@ function AuthenticatedShell({ user }: { user: User }) {
     );
   }
 
-  return <AppContent />;
+  return <AppContent onLogout={onLogout} />;
 }
 
 export default function App() {
   return (
     <AuthGuard>
-      {(user) => <AuthenticatedShell user={user} />}
+      {({ user, onLogout }) => <AuthenticatedShell user={user} onLogout={onLogout} />}
     </AuthGuard>
   );
 }

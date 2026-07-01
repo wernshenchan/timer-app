@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useTimeStore } from '@/store/timeStore';
 import { formatTime, formatTimeDecimal } from '@/hooks/useTimerDisplay';
 import { useSettings } from '@/hooks/useSettings';
-import { Clock, BarChart3, Hash } from 'lucide-react';
+import { Clock, BarChart3, Hash, LogOut } from 'lucide-react';
 
 interface Props {
   onReportClick: () => void;
+  onLogout: () => void;
 }
 
-export default function Header({ onReportClick }: Props) {
+export default function Header({ onReportClick, onLogout }: Props) {
   const getTotalTodaySeconds = useTimeStore((s) => s.getTotalTodaySeconds);
   const { decimalHours, update } = useSettings();
   const [totalToday, setTotalToday] = useState('00:00:00');
@@ -54,6 +55,13 @@ export default function Header({ onReportClick }: Props) {
             <span className="text-zinc-500">Today:</span>
             <span className={`font-medium tabular-nums text-amber-400 ${decimalHours ? 'text-sm' : 'timer-font'}`}>{totalToday}</span>
           </div>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-500 rounded-lg py-1.5 px-2 transition-colors shrink-0"
+            title="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </header>
